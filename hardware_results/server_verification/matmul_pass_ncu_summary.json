@@ -1,0 +1,16 @@
+{
+  "orig": {
+    "total": 1060,
+    "load": 16,
+    "store": 1036,
+    "gpu_time_ns": 168896,
+    "rows": 1
+  },
+  "f2": {
+    "total": 1055,
+    "load": 12,
+    "store": 1026,
+    "gpu_time_ns": 169792,
+    "rows": 1
+  }
+}

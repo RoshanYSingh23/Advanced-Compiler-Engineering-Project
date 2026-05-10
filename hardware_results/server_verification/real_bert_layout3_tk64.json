@@ -1,0 +1,17 @@
+{
+  "model": "bert",
+  "layout": 3,
+  "layout_name": "hexcute_swizzle_2_3_3",
+  "tile_k": 64,
+  "seq_len": 128,
+  "batch": 1,
+  "iters": 3,
+  "elapsed_s": 20.322098931996152,
+  "per_iter_ms": 6774.032977332051,
+  "output_shape": [
+    1,
+    128,
+    768
+  ],
+  "device": "NVIDIA GeForce GTX 1660 Ti"
+}

@@ -1,0 +1,580 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8488174..1872275 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -188,6 +188,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-covered-switch-default")
+ 
+ include_directories(${MLIR_INCLUDE_DIRS})
+ include_directories(${LLVM_INCLUDE_DIRS})
++include_directories(${PROJECT_SOURCE_DIR})
+ include_directories(${PROJECT_SOURCE_DIR}/include)
+ include_directories(${PROJECT_BINARY_DIR}/include) # Tablegen'd files
+ 
+@@ -275,6 +276,7 @@ if (${CODEGEN_BACKENDS_LEN} GREATER 0)
+   endforeach()
+ endif()
+ 
+-add_subdirectory(test)
+-
+-add_subdirectory(unittest)
++if(BUILD_TESTING)
++  add_subdirectory(test)
++  add_subdirectory(unittest)
++endif()
+diff --git a/bin/CMakeLists.txt b/bin/CMakeLists.txt
+index 41cb4d6..6b5d0e7 100644
+--- a/bin/CMakeLists.txt
++++ b/bin/CMakeLists.txt
+@@ -1,7 +1,22 @@
+ get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+ 
+-add_llvm_executable(triton-opt triton-opt.cpp PARTIAL_SOURCES_INTENDED)
++set(TRITON_OPTIONAL_TEST_LIBS)
++if(TARGET TritonTestAnalysis)
++  list(APPEND TRITON_OPTIONAL_TEST_LIBS TritonTestAnalysis)
++endif()
++
++set(LLVM_OPTIONAL_SOURCES
++  triton-opt.cpp
++  triton-reduce.cpp
++  triton-translate.cpp
++  triton-llvm-opt.cpp
++)
++
++add_llvm_executable(triton-opt triton-opt.cpp)
++if(TARGET TritonTestAnalysis)
++  target_compile_definitions(triton-opt PRIVATE TRITON_ENABLE_TEST_PASSES)
++endif()
+ 
+ # TODO: what's this?
+ llvm_update_compile_flags(triton-opt)
+@@ -12,8 +27,7 @@ target_link_libraries(triton-opt PRIVATE
+   TritonNvidiaGPUTransforms
+   ${dialect_libs}
+   ${conversion_libs}
+-  # tests
+-  TritonTestAnalysis
++  ${TRITON_OPTIONAL_TEST_LIBS}
+   # MLIR core
+   MLIROptLib
+   MLIRPass
+@@ -22,7 +36,10 @@ target_link_libraries(triton-opt PRIVATE
+ 
+ mlir_check_all_link_libraries(triton-opt)
+ 
+-add_llvm_executable(triton-reduce triton-reduce.cpp PARTIAL_SOURCES_INTENDED)
++add_llvm_executable(triton-reduce triton-reduce.cpp)
++if(TARGET TritonTestAnalysis)
++  target_compile_definitions(triton-reduce PRIVATE TRITON_ENABLE_TEST_PASSES)
++endif()
+ mlir_check_all_link_libraries(triton-reduce)
+ 
+ llvm_update_compile_flags(triton-reduce)
+@@ -33,8 +50,7 @@ target_link_libraries(triton-reduce PRIVATE
+   TritonNvidiaGPUTransforms
+   ${dialect_libs}
+   ${conversion_libs}
+-  # tests
+-  TritonTestAnalysis
++  ${TRITON_OPTIONAL_TEST_LIBS}
+   # MLIR core
+   MLIRReduceLib
+   MLIRPass
+@@ -44,7 +60,10 @@ target_link_libraries(triton-reduce PRIVATE
+ mlir_check_all_link_libraries(triton-reduce)
+ 
+ 
+-add_llvm_executable(triton-translate triton-translate.cpp PARTIAL_SOURCES_INTENDED)
++add_llvm_executable(triton-translate triton-translate.cpp)
++if(TARGET TritonTestAnalysis)
++  target_compile_definitions(triton-translate PRIVATE TRITON_ENABLE_TEST_PASSES)
++endif()
+ llvm_update_compile_flags(triton-translate)
+  target_link_libraries(triton-translate PRIVATE
+          TritonAnalysis
+@@ -55,8 +74,7 @@ llvm_update_compile_flags(triton-translate)
+          TritonPTX
+          ${dialect_libs}
+          ${conversion_libs}
+-         # tests
+-         TritonTestAnalysis
++         ${TRITON_OPTIONAL_TEST_LIBS}
+ 
+          LLVMCore
+          LLVMSupport
+diff --git a/bin/RegisterTritonDialects.h b/bin/RegisterTritonDialects.h
+index e88a9a5..7d87e1e 100644
+--- a/bin/RegisterTritonDialects.h
++++ b/bin/RegisterTritonDialects.h
+@@ -17,10 +17,12 @@
+ 
+ namespace mlir {
+ namespace test {
++#ifdef TRITON_ENABLE_TEST_PASSES
+ void registerTestAliasPass();
+ void registerTestAlignmentPass();
+ void registerTestAllocationPass();
+ void registerTestMembarPass();
++#endif
+ } // namespace test
+ } // namespace mlir
+ 
+@@ -29,10 +31,12 @@ inline void registerTritonDialects(mlir::DialectRegistry &registry) {
+   mlir::registerTritonPasses();
+   mlir::registerTritonGPUPasses();
+   mlir::registerTritonNvidiaGPUPasses();
++#ifdef TRITON_ENABLE_TEST_PASSES
+   mlir::test::registerTestAliasPass();
+   mlir::test::registerTestAlignmentPass();
+   mlir::test::registerTestAllocationPass();
+   mlir::test::registerTestMembarPass();
++#endif
+   mlir::triton::registerConvertTritonToTritonGPUPass();
+   mlir::triton::registerConvertTritonGPUToLLVMPass();
+   mlir::triton::registerConvertNVGPUToLLVMPass();
+diff --git a/include/triton/Dialect/TritonGPU/Transforms/Passes.h b/include/triton/Dialect/TritonGPU/Transforms/Passes.h
+index 2ee5643..7f0da87 100644
+--- a/include/triton/Dialect/TritonGPU/Transforms/Passes.h
++++ b/include/triton/Dialect/TritonGPU/Transforms/Passes.h
+@@ -34,6 +34,8 @@ std::unique_ptr<Pass> createTritonGPUOptimizeEpiloguePass();
+ 
+ std::unique_ptr<Pass> createTritonGPUOptimizeThreadLocalityPass();
+ 
++std::unique_ptr<Pass> createTritonGPUF2SharedLayoutPass();
++
+ /// Generate the code for registering passes.
+ #define GEN_PASS_REGISTRATION
+ #include "triton/Dialect/TritonGPU/Transforms/Passes.h.inc"
+diff --git a/include/triton/Dialect/TritonGPU/Transforms/Passes.td b/include/triton/Dialect/TritonGPU/Transforms/Passes.td
+index 0476fd8..97f98dc 100644
+--- a/include/triton/Dialect/TritonGPU/Transforms/Passes.td
++++ b/include/triton/Dialect/TritonGPU/Transforms/Passes.td
+@@ -161,4 +161,34 @@ def TritonGPUDecomposeConversions: Pass<"tritongpu-decompose-conversions", "mlir
+                            "mlir::triton::TritonDialect"];
+ }
+ 
++def TritonGPUF2SharedLayout : Pass<"tritongpu-f2-shared-layout", "mlir::ModuleOp"> {
++  let summary = "Rewrite Triton shared-memory encodings using an F2 swizzle search";
++
++  let description = [{
++    Walk Triton GPU IR, find tensors encoded with `#triton_gpu.shared`, infer
++    the logical 2-D tile carried by the shared layout, run an F2 swizzle search
++    constrained to Triton's shared encoding parameterization, and rewrite the
++    shared encoding attributes in-place.
++
++    The pass updates `perPhase`, `maxPhase`, and preserves `vec`, `order`,
++    `CTALayout`, and `hasLeadingOffset`, so the output remains valid TTGIR and
++    can be printed directly by `triton-opt`.
++  }];
++
++  let constructor = "mlir::createTritonGPUF2SharedLayoutPass()";
++
++  let dependentDialects = ["mlir::triton::gpu::TritonGPUDialect",
++                           "mlir::triton::TritonDialect",
++                           "mlir::scf::SCFDialect"];
++
++  let options = [
++    Option<"maxSwizzleBits", "f2-max-swizzle-bits",
++           "int32_t", /*default=*/"3",
++           "Maximum B/M search range explored by the Triton-representable F2 search">,
++    Option<"emitRemarks", "f2-emit-remarks",
++           "bool", /*default=*/"true",
++           "Emit pass remarks describing the chosen shared-memory parameters">
++  ];
++}
++
+ #endif
+diff --git a/lib/Conversion/TritonGPUToLLVM/CMakeLists.txt b/lib/Conversion/TritonGPUToLLVM/CMakeLists.txt
+index 590bc6b..7924f68 100644
+--- a/lib/Conversion/TritonGPUToLLVM/CMakeLists.txt
++++ b/lib/Conversion/TritonGPUToLLVM/CMakeLists.txt
+@@ -1,8 +1,23 @@
+ # Separate out PTX/GCN builders to avoid cyclic dependencies as TritonAnalysis
+ # depends on it.
+ set(LLVM_OPTIONAL_SOURCES
++    BarrierOpToLLVM.cpp
++    ClusterOpsToLLVM.cpp
++    ConvertLayoutOpToLLVM.cpp
++    DotOpToLLVM.cpp
++    ElementwiseOpToLLVM.cpp
+     GCNAsmFormat.cpp
++    LoadStoreOpToLLVM.cpp
+     PTXAsmFormat.cpp
++    ReduceOpToLLVM.cpp
++    RegReallocOpToLLVM.cpp
++    ScanOpToLLVM.cpp
++    TensorPtrOpsToLLVM.cpp
++    TritonGPUToLLVM.cpp
++    TritonGPUToLLVMPass.cpp
++    TypeConverter.cpp
++    Utility.cpp
++    ViewOpToLLVM.cpp
+   )
+ 
+ add_mlir_conversion_library(TritonGPUToLLVM
+diff --git a/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt b/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
+index 2cd6e26..26bb3c2 100644
+--- a/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
++++ b/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
+@@ -2,6 +2,7 @@ add_mlir_dialect_library(TritonGPUTransforms
+   AccelerateMatmul.cpp
+   Coalesce.cpp
+   DecomposeConversions.cpp
++  F2SharedLayout.cpp
+   OptimizeDotOperands.cpp
+   OptimizeEpilogue.cpp
+   OptimizeThreadLocality.cpp
+
+diff --git a/lib/Dialect/TritonGPU/Transforms/F2SharedLayout.cpp b/lib/Dialect/TritonGPU/Transforms/F2SharedLayout.cpp
+new file mode 100644
+index 0000000..7d36c6d
+--- /dev/null
++++ b/lib/Dialect/TritonGPU/Transforms/F2SharedLayout.cpp
+@@ -0,0 +1,346 @@
++#include "llvm/ADT/StringMap.h"
++#include "mlir/IR/AsmState.h"
++#include "mlir/IR/BuiltinTypes.h"
++#include "mlir/IR/Diagnostics.h"
++#include "mlir/IR/Verifier.h"
++#include "mlir/Pass/Pass.h"
++#include "triton/Dialect/Triton/IR/Dialect.h"
++#include "triton/Dialect/TritonGPU/IR/Dialect.h"
++#include "triton/Dialect/TritonGPU/Transforms/Passes.h"
++
++#include <cmath>
++#include <limits>
++#include <map>
++#include <numeric>
++#include <string>
++
++#define GEN_PASS_CLASSES
++#include "triton/Dialect/TritonGPU/Transforms/Passes.h.inc"
++
++using namespace mlir;
++
++namespace {
++
++struct SwizzleChoice {
++  int B = 0;
++  int M = 0;
++  int S = 0;
++  int rank = 0;
++  int conflicts = std::numeric_limits<int>::max();
++  int perPhase = 1;
++  int maxPhase = 1;
++};
++
++static int ceilLog2(int64_t value) {
++  int bits = 0;
++  int64_t x = std::max<int64_t>(value, 1);
++  x -= 1;
++  while (x > 0) {
++    ++bits;
++    x >>= 1;
++  }
++  return std::max(bits, 1);
++}
++
++static int applySwizzle(int row, int col, const SwizzleChoice &choice) {
++  if (choice.B == 0)
++    return col;
++  int mask = (1 << choice.B) - 1;
++  int swizzleBits = (row >> choice.M) & mask;
++  return col ^ (swizzleBits << choice.S);
++}
++
++static int f2Rank(std::vector<uint64_t> rows, int cols) {
++  int rank = 0;
++  for (int col = 0; col < cols; ++col) {
++    int pivot = -1;
++    for (int row = rank; row < static_cast<int>(rows.size()); ++row) {
++      if ((rows[row] >> col) & 1ULL) {
++        pivot = row;
++        break;
++      }
++    }
++    if (pivot == -1)
++      continue;
++    std::swap(rows[rank], rows[pivot]);
++    for (int row = 0; row < static_cast<int>(rows.size()); ++row) {
++      if (row != rank && ((rows[row] >> col) & 1ULL))
++        rows[row] ^= rows[rank];
++    }
++    ++rank;
++  }
++  return rank;
++}
++
++static int countBankConflicts(int tileRows, int tileCols,
++                              const SwizzleChoice &choice) {
++  auto offset = [&](int row, int col) {
++    return row * tileCols + applySwizzle(row, col, choice);
++  };
++
++  int total = 0;
++  for (int row = 0; row < std::min(tileRows, 8); ++row) {
++    std::map<int, int> bankCounts;
++    for (int tid = 0; tid < std::min(tileCols, 32); ++tid)
++      bankCounts[offset(row, tid) % 32]++;
++    for (const auto &entry : bankCounts)
++      total += std::max(0, entry.second - 1);
++  }
++  for (int col = 0; col < std::min(tileCols, 8); ++col) {
++    std::map<int, int> bankCounts;
++    for (int tid = 0; tid < std::min(tileRows, 32); ++tid)
++      bankCounts[offset(tid, col) % 32]++;
++    for (const auto &entry : bankCounts)
++      total += std::max(0, entry.second - 1);
++  }
++  return total;
++}
++
++static int computeBankRank(int tileRows, int tileCols, const SwizzleChoice &choice) {
++  int rowBits = ceilLog2(tileRows);
++  int colBits = ceilLog2(tileCols);
++  int inputBits = rowBits + colBits;
++  std::vector<uint64_t> bankRows(5, 0);
++
++  for (int bitIdx = 0; bitIdx < inputBits; ++bitIdx) {
++    int row = 0;
++    int col = 0;
++    if (bitIdx < colBits)
++      col = 1 << bitIdx;
++    else
++      row = 1 << (bitIdx - colBits);
++    int offset = row * tileCols + applySwizzle(row, col, choice);
++    for (int bankBit = 0; bankBit < 5; ++bankBit) {
++      if ((offset >> bankBit) & 1)
++        bankRows[bankBit] |= (1ULL << bitIdx);
++    }
++  }
++  return f2Rank(bankRows, inputBits);
++}
++
++static SwizzleChoice findBestRepresentableF2(int tileRows, int tileCols,
++                                             int maxSwizzleBits) {
++  SwizzleChoice best;
++  bool initialized = false;
++  for (int B = 0; B <= maxSwizzleBits; ++B) {
++    for (int M = 0; M <= maxSwizzleBits; ++M) {
++      SwizzleChoice current;
++      current.B = B;
++      current.M = M;
++      current.S = 0;
++      current.rank = computeBankRank(tileRows, tileCols, current);
++      current.conflicts = countBankConflicts(tileRows, tileCols, current);
++      current.perPhase = std::max(1, 1 << M);
++      current.maxPhase = std::max(1, 1 << B);
++
++      if (!initialized || current.rank > best.rank ||
++          (current.rank == best.rank && current.conflicts < best.conflicts) ||
++          (current.rank == best.rank && current.conflicts == best.conflicts &&
++           current.maxPhase > best.maxPhase)) {
++        best = current;
++        initialized = true;
++      }
++    }
++  }
++  return best;
++}
++
++static SmallVector<int64_t> getLogicalSharedShape(RankedTensorType tensorType) {
++  auto shared =
++      tensorType.getEncoding().dyn_cast<mlir::triton::gpu::SharedEncodingAttr>();
++  if (!shared)
++    return {};
++
++  auto tensorShape = tensorType.getShape();
++  unsigned encodedRank = shared.getOrder().size();
++  if (tensorShape.size() < encodedRank || encodedRank == 0)
++    return {};
++
++  SmallVector<int64_t> logicalShape;
++  unsigned begin = tensorShape.size() - encodedRank;
++  for (unsigned i = begin; i < tensorShape.size(); ++i)
++    logicalShape.push_back(tensorShape[i]);
++  return logicalShape;
++}
++
++static std::string makeEncodingKey(Attribute encoding) {
++  std::string key;
++  llvm::raw_string_ostream os(key);
++  encoding.print(os);
++  return os.str();
++}
++
++static int64_t logicalShapeArea(ArrayRef<int64_t> logicalShape) {
++  if (logicalShape.empty())
++    return 0;
++  int64_t area = 1;
++  for (int64_t dim : logicalShape)
++    area *= std::max<int64_t>(dim, 1);
++  return area;
++}
++
++class TritonGPUF2SharedLayoutPass
++    : public TritonGPUF2SharedLayoutBase<TritonGPUF2SharedLayoutPass> {
++public:
++  TritonGPUF2SharedLayoutPass() = default;
++
++  void runOnOperation() override {
++    ModuleOp module = getOperation();
++    MLIRContext *ctx = &getContext();
++
++    llvm::StringMap<Attribute> rewrittenEncodings;
++    llvm::StringMap<SwizzleChoice> chosenLayouts;
++    llvm::StringMap<Attribute> originalEncodings;
++    llvm::StringMap<SmallVector<int64_t>> representativeShapes;
++
++    auto recordTensorType = [&](Type type) {
++      auto tensorType = type.dyn_cast<RankedTensorType>();
++      if (!tensorType)
++        return;
++      auto shared =
++          tensorType.getEncoding().dyn_cast<triton::gpu::SharedEncodingAttr>();
++      if (!shared)
++        return;
++
++      auto logicalShape = getLogicalSharedShape(tensorType);
++      if (logicalShape.size() != 2)
++        return;
++
++      std::string key = makeEncodingKey(shared);
++      originalEncodings[key] = shared;
++      auto existing = representativeShapes.find(key);
++      if (existing == representativeShapes.end() ||
++          logicalShapeArea(logicalShape) >
++              logicalShapeArea(existing->getValue()))
++        representativeShapes[key] = logicalShape;
++    };
++
++    module.walk([&](triton::FuncOp func) {
++      auto funcType = func.getFunctionType();
++      for (Type inputType : funcType.getInputs())
++        recordTensorType(inputType);
++      for (Type resultType : funcType.getResults())
++        recordTensorType(resultType);
++    });
++
++    module.walk([&](Operation *op) {
++      for (Region &region : op->getRegions()) {
++        for (Block &block : region) {
++          for (BlockArgument arg : block.getArguments())
++            recordTensorType(arg.getType());
++        }
++      }
++      for (Value result : op->getResults())
++        recordTensorType(result.getType());
++    });
++
++    for (const auto &entry : representativeShapes) {
++      auto originalEncoding =
++          originalEncodings.lookup(entry.getKey())
++              .cast<triton::gpu::SharedEncodingAttr>();
++      auto logicalShape = entry.getValue();
++      auto choice = findBestRepresentableF2(static_cast<int>(logicalShape[0]),
++                                            static_cast<int>(logicalShape[1]),
++                                            maxSwizzleBits);
++      SmallVector<unsigned> order(originalEncoding.getOrder().begin(),
++                                  originalEncoding.getOrder().end());
++      auto newEncoding = triton::gpu::SharedEncodingAttr::get(
++          ctx, originalEncoding.getVec(), choice.perPhase, choice.maxPhase,
++          order, originalEncoding.getCTALayout(),
++          originalEncoding.getHasLeadingOffset());
++      rewrittenEncodings[entry.getKey()] = newEncoding;
++      chosenLayouts[entry.getKey()] = choice;
++    }
++
++    auto rewriteTensorType = [&](Type type) -> Type {
++      auto tensorType = type.dyn_cast<RankedTensorType>();
++      if (!tensorType)
++        return type;
++      auto shared =
++          tensorType.getEncoding().dyn_cast<triton::gpu::SharedEncodingAttr>();
++      if (!shared)
++        return type;
++
++      auto logicalShape = getLogicalSharedShape(tensorType);
++      if (logicalShape.size() != 2)
++        return type;
++
++      std::string key = makeEncodingKey(shared);
++      auto cached = rewrittenEncodings.find(key);
++      if (cached == rewrittenEncodings.end())
++        return type;
++
++      return RankedTensorType::get(tensorType.getShape(),
++                                   tensorType.getElementType(),
++                                   cached->second);
++    };
++
++    module.walk([&](triton::FuncOp func) {
++      auto funcType = func.getFunctionType();
++      SmallVector<Type> newInputs;
++      SmallVector<Type> newResults;
++      bool changed = false;
++
++      newInputs.reserve(funcType.getNumInputs());
++      for (Type inputType : funcType.getInputs()) {
++        Type rewritten = rewriteTensorType(inputType);
++        changed |= rewritten != inputType;
++        newInputs.push_back(rewritten);
++      }
++
++      newResults.reserve(funcType.getNumResults());
++      for (Type resultType : funcType.getResults()) {
++        Type rewritten = rewriteTensorType(resultType);
++        changed |= rewritten != resultType;
++        newResults.push_back(rewritten);
++      }
++
++      if (changed)
++        func.setType(FunctionType::get(ctx, newInputs, newResults));
++    });
++
++    module.walk([&](Operation *op) {
++      for (Region &region : op->getRegions()) {
++        for (Block &block : region) {
++          for (BlockArgument arg : block.getArguments()) {
++            Type newType = rewriteTensorType(arg.getType());
++            if (newType != arg.getType())
++              arg.setType(newType);
++          }
++        }
++      }
++
++      for (Value result : op->getResults()) {
++        Type newType = rewriteTensorType(result.getType());
++        if (newType != result.getType())
++          result.setType(newType);
++      }
++    });
++
++    if (emitRemarks) {
++      module.walk([&](triton::FuncOp func) {
++        for (const auto &entry : chosenLayouts) {
++          const auto &choice = entry.getValue();
++          auto shape = representativeShapes.lookup(entry.getKey());
++          func.emitRemark()
++              << "F2 shared layout rewrite " << entry.getKey()
++              << " representativeShape=[" << shape[0] << "x" << shape[1]
++              << "]"
++              << " -> Swizzle<" << choice.B << "," << choice.M << ","
++              << choice.S << "> with perPhase=" << choice.perPhase
++              << ", maxPhase=" << choice.maxPhase << ", rank=" << choice.rank
++              << ", simulatedConflicts=" << choice.conflicts;
++        }
++      });
++    }
++
++    if (failed(verify(module)))
++      signalPassFailure();
++  }
++};
++
++} // namespace
++
++std::unique_ptr<Pass> mlir::createTritonGPUF2SharedLayoutPass() {
++  return std::make_unique<TritonGPUF2SharedLayoutPass>();
++}

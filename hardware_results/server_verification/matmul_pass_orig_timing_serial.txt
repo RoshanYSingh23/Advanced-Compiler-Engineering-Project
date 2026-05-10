@@ -1,0 +1,7 @@
+device=NVIDIA GeForce GTX 1660 Ti
+ptx=ptx_outputs/matmul_kernel_orig.ptx
+iters=5000
+grid=1x1x1 block=128x1x1 smem=49152
+total_ms=763.9445
+per_iter_ms=0.1528
+checksum=0.0000

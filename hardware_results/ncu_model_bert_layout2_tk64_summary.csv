@@ -1,0 +1,8 @@
+tile_k,layout_id,layout,tag,tag_name,kernel_kind,load_conflicts,store_conflicts,total_conflicts,ncu_rows,is_hardware_ncu
+-3,-1,pointwise_or_other,-1,pointwise_or_other,softmax_like,0,0,0,24,1
+-2,-1,pointwise_or_other,-1,pointwise_or_other,gelu,0,0,0,36,1
+-1,-1,pointwise_or_other,-1,pointwise_or_other,layernorm,0,0,0,24,1
+64,2,f2_swizzle_3_0_0,0,qkv_or_ffn_up,gemm,0,0,0,24,1
+64,2,f2_swizzle_3_0_0,1,attn_score,gemm,0,0,0,12,1
+64,2,f2_swizzle_3_0_0,2,attn_value_or_ffn_down,gemm,0,0,0,12,1
+64,2,f2_swizzle_3_0_0,3,out_proj,gemm,0,0,0,24,1

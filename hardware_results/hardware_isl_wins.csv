@@ -1,0 +1,13 @@
+experiment,tile_k,tag_name,best_reference_layout,best_reference_conflicts,best_isl_layout,best_isl_conflicts
+stress,32,stress_col0_row_lane,f2_swizzle_3_0_0,3145728,isl_affine_a1,0
+stress,32,stress_col0_row_2lane,f2_swizzle_3_0_0,3145728,isl_affine_a1,0
+stress,32,stress_col_lane_row_lane,hexcute_swizzle_2_3_3,3145728,isl_affine_a1,1048576
+stress,32,stress_col_3lane_row_lane,f2_swizzle_3_0_0,3145728,isl_blocked_affine,0
+stress,64,stress_col0_row_lane,f2_swizzle_3_0_0,3145728,isl_affine_a1,0
+stress,64,stress_col0_row_2lane,f2_swizzle_3_0_0,3145728,isl_affine_a1,0
+stress,64,stress_col_lane_row_lane,hexcute_swizzle_2_3_3,3145728,isl_affine_a1,1048576
+stress,64,stress_col_3lane_row_lane,f2_swizzle_3_0_0,3145728,isl_blocked_affine,0
+stress,128,stress_col0_row_lane,f2_swizzle_3_0_0,3145877,isl_affine_a1,182
+stress,128,stress_col0_row_2lane,f2_swizzle_3_0_0,3145830,isl_affine_a1,162
+stress,128,stress_col_lane_row_lane,hexcute_swizzle_2_3_3,3145844,isl_blocked_affine,1048803
+stress,128,stress_col_3lane_row_lane,hexcute_swizzle_2_3_3,3145830,isl_blocked_affine,174

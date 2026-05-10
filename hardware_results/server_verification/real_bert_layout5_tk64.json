@@ -1,0 +1,17 @@
+{
+  "model": "bert",
+  "layout": 5,
+  "layout_name": "isl_affine_a1",
+  "tile_k": 64,
+  "seq_len": 128,
+  "batch": 1,
+  "iters": 3,
+  "elapsed_s": 20.680088353008614,
+  "per_iter_ms": 6893.362784336205,
+  "output_shape": [
+    1,
+    128,
+    768
+  ],
+  "device": "NVIDIA GeForce GTX 1660 Ti"
+}
