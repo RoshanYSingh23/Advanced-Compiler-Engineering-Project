@@ -1,29 +1,8 @@
 # ACE Project
 
-This folder is the GitHub-ready subset of the larger workspace. Upload `ACE_Project` to GitHub, not the entire original directory.
-
+This folder is the GitHub-ready subset of the larger workspace, not the entire original directory.
 The full workspace contains large vendored trees, local LLVM/Triton toolchains, downloaded archives, and temporary build products that do not belong in the repository. This curated folder keeps only the report, the project-owned source files, the Triton pass patch and source snapshots, the TTGIR/PTX artifacts used in the pass experiment, the raw and summary results used by the report, and the plots that appear in the report.
 
-## What To Upload
-
-Upload the entire `ACE_Project` folder.
-
-Do not upload the original workspace root, especially not:
-
-- `triton-src/`
-- `llvm-project-14/`
-- `clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/`
-- `llvm14-install/`
-- `llvm-5e5a22ca-min/`
-- `llvm-5e5a22ca-ubuntu-x64.tar.gz`
-- `local_mlir14/`
-- `local_debs/`
-- `cutlass/`
-- `ppcg/`
-- `PyTorchSim/`
-- any `build/`, `build-llvm/`, or `__pycache__/` directories
-
-Those directories are dependencies, mirrors, downloads, or local build products. They make the repository huge and are not required for submission.
 
 ## What This Repository Contains
 
@@ -252,20 +231,3 @@ This regenerates every figure referenced by `report.tex`, including:
 3. Compile `report.tex`.
 
 The report is already written to use the packaged PNG figures directly, so no path changes are needed if the directory structure is preserved.
-
-## Practical Submission Advice
-
-If this is for GitHub submission, the cleanest commit is:
-
-- all of `ACE-Project/`
-- none of the original large dependency or build directories
-
-If this is for a course submission, the most important visible artifacts are:
-
-- `report.tex`
-- `figures/`
-- `triton_pass/`
-- the source files for F2, HexCute, ISL, CUDA, and PyTorch experiments
-- the raw and summary data under `hardware_results/`
-
-That combination captures both the implementation and the evidence behind the report without forcing the repository to carry third-party source trees or local compiler installs.
